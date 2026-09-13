@@ -513,12 +513,8 @@
  
     <div class="field-row">
       <label>Фото в одному запиті (розмір колажу/PDF)</label>
-      <div class="seg" id="batchSeg">
-        <button data-v="1">1</button>
-        <button data-v="2">2</button>
-        <button data-v="4" class="active">4</button>
-        <button data-v="6">6</button>
-      </div>
+      <input type="number" id="batchSizeInput" min="1" max="20" value="4">
+      <p style="font-size:11px;color:var(--muted-2);margin:6px 0 0;line-height:1.4;">Максимум 20 фото за один запит.</p>
     </div>
  
     <div class="field-row">
@@ -596,9 +592,7 @@
   function applySettingsToUI(){
     $('#apiKeyInput').value = settings.apiKey || '';
     $('#modelInput').value = settings.model || 'gemini-3.5-flash-lite';
-    document.querySelectorAll('#batchSeg button').forEach(b=>{
-      b.classList.toggle('active', Number(b.dataset.v)===Number(settings.batchSize));
-    });
+    $('#batchSizeInput').value = settings.batchSize || 4;
     document.querySelectorAll('#modeSeg button').forEach(b=>{
       b.classList.toggle('active', b.dataset.v===settings.mode);
     });
@@ -609,12 +603,6 @@
   $('#closeSettings').onclick = ()=> $('#modalOverlay').classList.remove('show');
   $('#modalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='modalOverlay') $('#modalOverlay').classList.remove('show'); });
  
-  document.querySelectorAll('#batchSeg button').forEach(b=>{
-    b.onclick = ()=>{
-      document.querySelectorAll('#batchSeg button').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-    };
-  });
   document.querySelectorAll('#modeSeg button').forEach(b=>{
     b.onclick = ()=>{
       document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.remove('active'));
@@ -625,7 +613,11 @@
   $('#saveSettings').onclick = async ()=>{
     settings.apiKey = $('#apiKeyInput').value.trim();
     settings.model = $('#modelInput').value.trim() || 'gemini-3.5-flash-lite';
-    settings.batchSize = Number(document.querySelector('#batchSeg button.active').dataset.v);
+    let batchSize = parseInt($('#batchSizeInput').value, 10);
+    if(isNaN(batchSize)) batchSize = 4;
+    batchSize = Math.max(1, Math.min(20, batchSize));
+    settings.batchSize = batchSize;
+    $('#batchSizeInput').value = batchSize;
     settings.mode = document.querySelector('#modeSeg button.active').dataset.v;
     const ok = await saveSettings();
     const okEl = $('#saveOk');
@@ -712,7 +704,7 @@
   async function buildCollage(batch){
     const imgs = await Promise.all(batch.map(p=>loadImage(p.dataURL)));
     const n = imgs.length;
-    const cols = n <= 1 ? 1 : (n <= 2 ? 2 : (n<=4 ? 2 : 3));
+    const cols = n <= 1 ? 1 : (n <= 4 ? 2 : (n <= 9 ? 3 : (n <= 16 ? 4 : 5)));
     const rows = Math.ceil(n/cols);
     const cellW = 1000;
     const gap = 14;
