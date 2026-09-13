@@ -7,6 +7,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+  window.onerror = function(msg, url, line, col, err){
+    var el = document.createElement('div');
+    el.setAttribute('style','position:fixed;top:0;left:0;right:0;background:#c4685a;color:#fff;padding:10px 14px;font-family:sans-serif;font-size:13px;z-index:99999;line-height:1.4;');
+    el.innerHTML = '<b>Помилка сторінки:</b> ' + msg + ' (рядок ' + line + ')';
+    if(document.body){ document.body.appendChild(el); }
+    else { document.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(el); }); }
+  };
+</script>
 <style>
   :root{
     --bg:#14181c;
@@ -795,7 +804,8 @@
       throw new Error(`Gemini API помилка (${resp.status}): ${errText}`);
     }
     const data = await resp.json();
-    const text = (((data.candidates||[])[0]||{}).content||{}).parts?.map(p=>p.text||'').join('') || '';
+    var textParts = (((data.candidates||[])[0]||{}).content||{}).parts || [];
+    const text = textParts.map(function(p){ return p.text || ''; }).join('') || '';
     let cleaned = text.trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
     let parsed;
     try{
@@ -886,7 +896,7 @@
   // ---------------- rendering ----------------
   const FIELD_LABELS = {
     pracownik_kod:'Працівник',
-    pracownik_nazwisko:'Ім\\'я',
+    pracownik_nazwisko:'Прізвище',
     data_rozpoczecia:'Дата початку',
     maszyna_forma:'Машина/форма',
     nr_katalogowy:'Кат. номер',
