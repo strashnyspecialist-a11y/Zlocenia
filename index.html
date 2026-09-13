@@ -297,22 +297,33 @@
     border-left:3px solid var(--amber);
     border-radius:var(--radius);
     animation:printIn .35s ease both;
+    cursor:pointer;
+    transition:border-color .15s ease, transform .1s ease;
+  }
+  .card:hover{
+    border-color:var(--muted-2);
+    border-left-color:var(--amber);
+  }
+  .card:active{
+    transform:scale(.99);
   }
   .card .stub{
-    padding:12px 14px 10px;
+    padding:12px 14px;
   }
   .card .stub .order-no{
     font-family:var(--mono);
-    font-size:14px;
-    font-weight:600;
-    color:var(--amber);
+    font-size:10.5px;
+    color:var(--muted-2);
     word-break:break-all;
   }
-  .card .stub .name{
-    margin-top:5px;
-    font-size:13.5px;
+  .card .stub .compact-line{
+    margin-top:4px;
+    font-size:15px;
+    font-weight:600;
+    color:var(--amber);
+    font-family:var(--mono);
+    word-break:break-word;
     line-height:1.35;
-    color:var(--text);
   }
   .card .perf{
     border-top:1px dashed var(--border);
@@ -326,7 +337,7 @@
   }
   .field{
     display:grid;
-    grid-template-columns:104px 1fr;
+    grid-template-columns:140px 1fr;
     gap:8px;
     font-size:12px;
     align-items:baseline;
@@ -522,6 +533,17 @@
       <span class="save-ok" id="saveOk">Збережено</span>
       <button class="btn ghost" id="closeSettings">Закрити</button>
       <button class="btn primary" id="saveSettings">Зберегти</button>
+    </div>
+  </div>
+</div>
+ 
+<!-- ORDER DETAIL MODAL -->
+<div class="modal-overlay" id="detailOverlay">
+  <div class="modal">
+    <h3 id="detailOrderNo" style="font-family:var(--mono);color:var(--amber);word-break:break-all;"></h3>
+    <div class="field-row" style="margin-top:14px; display:flex; flex-direction:column; gap:8px;" id="detailFields"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="closeDetail">Закрити</button>
     </div>
   </div>
 </div>
@@ -894,23 +916,27 @@
   }
  
   // ---------------- rendering ----------------
-  const FIELD_LABELS = {
-    pracownik_kod:'Працівник',
-    pracownik_nazwisko:'Прізвище',
-    data_rozpoczecia:'Дата початку',
-    maszyna_forma:'Машина/форма',
-    nr_katalogowy:'Кат. номер',
-    klient:'Клієнт',
-    uwagi_zamowienia:'Прим. замовл.',
-    uwagi_zlecenia:'Прим. до зл.',
-    ilosc_na_zleceniu:'Кількість',
-    opis_operacji:'Операція',
-    szt_na_palecie:'Шт/палета',
-    rodzaj_palety:'Тип палети',
-    wysokosc_palety:'Висота палети',
-    szt_w_kartonie:'Шт/картон'
-  };
- 
+  // На згорнутій картці показуємо лише: машина/форма + номер етикетки (щоб зайняти мінімум місця).
+  // Повна інформація відкривається по кліку на картку.
+  const DETAIL_FIELDS = [
+    ['maszyna_forma', 'Машина/форма'],
+    ['data_rozpoczecia', 'Дата початку'],
+    ['nr_katalogowy', 'Numer katalogowy'],
+    ['nazwa_produktu', 'Nazwa'],
+    ['uwagi_zamowienia', 'Uwagi do zamówienia'],
+    ['uwagi_zlecenia', 'Uwagi do zlecenia'],
+    ['ilosc_na_zleceniu', 'Ilość na zleceniu']
+  ];
+
+  // Номер етикетки з "Uwagi do zamówienia": завжди 6-значний код, перед яким
+  // інколи стоїть один символ-префікс (напр. E, G, #), а інколи взагалі нічого.
+  function extractLabelCode(s){
+    if(!s) return '';
+    const str = String(s);
+    const m = str.match(/[A-ZĄĆĘŁŃÓŚŹŻ#]?\d{6}\b/i);
+    return m ? m[0] : str.trim();
+  }
+
   function renderCards(){
     cardsEl.innerHTML = '';
     if(results.length === 0){
@@ -926,21 +952,32 @@
     results.forEach(rec=>{
       const card = document.createElement('div');
       card.className = 'card';
-      const fieldsHtml = Object.keys(FIELD_LABELS).map(k=>{
-        const v = rec[k];
-        return `<div class="field"><span class="k">${FIELD_LABELS[k]}</span><span class="v ${v?'':'empty'}">${v ? escapeHtml(v) : '—'}</span></div>`;
-      }).join('');
+ 
+      const labelCode = extractLabelCode(rec.uwagi_zamowienia);
+      const compactParts = [rec.maszyna_forma, labelCode].filter(Boolean).map(escapeHtml);
+      const compactLine = compactParts.join('&nbsp;&nbsp;') || '—';
+ 
       card.innerHTML = `
         <div class="stub">
           <div class="order-no">${escapeHtml(rec.numer_zlecenia || 'Без номера')}</div>
-          <div class="name">${escapeHtml(rec.nazwa_produktu || '')}</div>
+          <div class="compact-line">${compactLine}</div>
         </div>
-        <div class="perf"></div>
-        <div class="fields">${fieldsHtml}</div>
       `;
+      card.addEventListener('click', ()=> openDetail(rec));
       cardsEl.appendChild(card);
     });
   }
+
+  function openDetail(rec){
+    $('#detailOrderNo').textContent = rec.numer_zlecenia || 'Без номера';
+    $('#detailFields').innerHTML = DETAIL_FIELDS.map(([k,label])=>{
+      const v = rec[k];
+      return `<div class="field"><span class="k">${label}</span><span class="v ${v?'':'empty'}">${v ? escapeHtml(v) : '—'}</span></div>`;
+    }).join('');
+    $('#detailOverlay').classList.add('show');
+  }
+  $('#closeDetail').onclick = ()=> $('#detailOverlay').classList.remove('show');
+  $('#detailOverlay').addEventListener('click', (e)=>{ if(e.target.id==='detailOverlay') $('#detailOverlay').classList.remove('show'); });
  
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -957,7 +994,7 @@
   };
  
   $('#exportCsvBtn').onclick = ()=>{
-    const headers = ['numer_zlecenia', ...Object.keys(FIELD_LABELS), 'nazwa_produktu'];
+    const headers = FIELD_SCHEMA;
     const rows = [headers.join(',')];
     results.forEach(rec=>{
       const row = headers.map(h => `"${(rec[h]||'').replace(/"/g,'""')}"`);
@@ -986,4 +1023,3 @@
 </script>
 </body>
 </html>
- 
