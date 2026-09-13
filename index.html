@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Картки замовлень — зі скріна в дані</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#14181c;
+    --surface:#1b2025;
+    --surface-2:#232a30;
+    --border:#343c43;
+    --border-soft:#2a3238;
+    --amber:#d9a441;
+    --amber-dim:#a97f34;
+    --steel:#5b8fa8;
+    --text:#edeff1;
+    --muted:#8c949c;
+    --muted-2:#5f676e;
+    --ok:#6fa97c;
+    --err:#c4685a;
+    --radius:5px;
+    --sans:'Space Grotesk',system-ui,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+  }
+  ::selection{background:var(--amber-dim);color:#14181c;}
+ 
+  a{color:var(--steel);}
+ 
+  .app{
+    display:grid;
+    grid-template-columns:320px 1fr;
+    min-height:100vh;
+  }
+  @media (max-width:860px){
+    .app{grid-template-columns:1fr;}
+  }
+ 
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    background:var(--surface);
+    border-right:1px solid var(--border);
+    padding:22px 20px 28px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  @media (max-width:860px){
+    .sidebar{border-right:none;border-bottom:1px solid var(--border);}
+  }
+ 
+  .brand{display:flex;align-items:center;justify-content:space-between;}
+  .brand h1{
+    font-size:17px;
+    font-weight:700;
+    margin:0;
+    letter-spacing:.01em;
+  }
+  .brand p{
+    margin:3px 0 0;
+    font-size:12px;
+    color:var(--muted);
+  }
+  .gear-btn{
+    background:transparent;
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    width:34px;height:34px;
+    color:var(--muted);
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    flex:none;
+  }
+  .gear-btn:hover{color:var(--text);border-color:var(--muted-2);}
+ 
+  .section-label{
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    margin:0 0 8px;
+  }
+ 
+  .upload-row{display:flex;gap:8px;}
+  .btn{
+    font-family:var(--sans);
+    font-weight:600;
+    font-size:13px;
+    padding:10px 14px;
+    border-radius:var(--radius);
+    border:1px solid var(--border);
+    background:var(--surface-2);
+    color:var(--text);
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .btn:hover{border-color:var(--muted-2);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .btn.primary{
+    background:var(--amber);
+    border-color:var(--amber);
+    color:#191307;
+  }
+  .btn.primary:hover{background:#e6b355;}
+  .btn.block{width:100%;}
+  .btn.ghost{background:transparent;}
+  .btn.small{padding:6px 10px;font-size:12px;}
+ 
+  .dropzone{
+    flex:1;
+    text-align:center;
+    padding:9px 6px;
+  }
+ 
+  #dropArea{
+    border:1px dashed var(--border);
+    border-radius:var(--radius);
+    padding:14px 10px;
+    text-align:center;
+    font-size:12px;
+    color:var(--muted);
+    margin-top:10px;
+    transition:border-color .15s ease, color .15s ease;
+  }
+  #dropArea.drag{
+    border-color:var(--amber);
+    color:var(--amber);
+  }
+ 
+  .thumbs{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:7px;
+    margin-top:12px;
+    max-height:260px;
+    overflow-y:auto;
+    padding-right:2px;
+  }
+  .thumb{
+    position:relative;
+    aspect-ratio:3/4;
+    border-radius:4px;
+    overflow:hidden;
+    border:1px solid var(--border);
+    background:#000;
+  }
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block;opacity:.92;}
+  .thumb .rm{
+    position:absolute;top:3px;right:3px;
+    width:18px;height:18px;
+    border-radius:3px;
+    background:rgba(20,24,28,.85);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-size:11px;
+    line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+  }
+  .thumb .idx{
+    position:absolute;bottom:3px;left:3px;
+    font-family:var(--mono);
+    font-size:10px;
+    color:var(--muted);
+    background:rgba(20,24,28,.85);
+    padding:1px 4px;
+    border-radius:2px;
+  }
+ 
+  .count-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:12px;
+    color:var(--muted);
+    margin-top:10px;
+  }
+  .count-row button{
+    background:none;border:none;color:var(--muted);
+    text-decoration:underline;cursor:pointer;font-size:12px;
+    font-family:var(--sans);
+    padding:0;
+  }
+  .count-row button:hover{color:var(--err);}
+ 
+  .divider{height:1px;background:var(--border-soft);}
+ 
+  .process-btn{
+    padding:13px 14px;
+    font-size:14px;
+  }
+ 
+  .progress{
+    display:none;
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--amber);
+    margin-top:2px;
+  }
+  .progress.show{display:block;}
+  .progress-bar{
+    height:3px;
+    background:var(--border-soft);
+    border-radius:2px;
+    overflow:hidden;
+    margin-top:6px;
+  }
+  .progress-bar-fill{
+    height:100%;
+    background:var(--amber);
+    width:0%;
+    transition:width .3s ease;
+  }
+ 
+  .banner{
+    display:none;
+    font-size:12px;
+    padding:9px 10px;
+    border-radius:var(--radius);
+    border:1px solid var(--err);
+    color:#f0b6ab;
+    background:rgba(196,104,90,.1);
+    line-height:1.4;
+  }
+  .banner.show{display:block;}
+  .banner.warn{
+    border-color:var(--amber-dim);
+    color:var(--amber);
+    background:rgba(217,164,65,.08);
+  }
+ 
+  /* ---------- Main ---------- */
+  .main{
+    padding:22px 26px 60px;
+  }
+  .toolbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-bottom:20px;
+  }
+  .toolbar h2{
+    font-size:15px;
+    margin:0;
+    color:var(--muted);
+    font-weight:500;
+  }
+  .toolbar .actions{display:flex;gap:8px;}
+ 
+  .empty{
+    border:1px dashed var(--border);
+    border-radius:var(--radius);
+    padding:60px 20px;
+    text-align:center;
+    color:var(--muted);
+    font-size:13px;
+    margin-top:40px;
+  }
+  .empty b{color:var(--text);}
+ 
+  .cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+    gap:14px;
+  }
+ 
+  @keyframes printIn{
+    from{opacity:0; transform:translateY(-10px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+ 
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-left:3px solid var(--amber);
+    border-radius:var(--radius);
+    animation:printIn .35s ease both;
+  }
+  .card .stub{
+    padding:12px 14px 10px;
+  }
+  .card .stub .order-no{
+    font-family:var(--mono);
+    font-size:14px;
+    font-weight:600;
+    color:var(--amber);
+    word-break:break-all;
+  }
+  .card .stub .name{
+    margin-top:5px;
+    font-size:13.5px;
+    line-height:1.35;
+    color:var(--text);
+  }
+  .card .perf{
+    border-top:1px dashed var(--border);
+    margin:0 14px;
+  }
+  .card .fields{
+    padding:10px 14px 14px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .field{
+    display:grid;
+    grid-template-columns:104px 1fr;
+    gap:8px;
+    font-size:12px;
+    align-items:baseline;
+  }
+  .field .k{color:var(--muted);}
+  .field .v{
+    font-family:var(--mono);
+    color:var(--text);
+    word-break:break-word;
+  }
+  .field .v.empty{color:var(--muted-2);}
+  .card .rawnote{
+    padding:0 14px 12px;
+    font-size:11px;
+    color:var(--muted-2);
+    font-style:italic;
+  }
+ 
+  /* ---------- Modal ---------- */
+  .modal-overlay{
+    position:fixed;inset:0;
+    background:rgba(10,12,14,.6);
+    display:none;
+    align-items:center;justify-content:center;
+    padding:20px;
+    z-index:50;
+  }
+  .modal-overlay.show{display:flex;}
+  .modal{
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:6px;
+    width:100%;
+    max-width:420px;
+    padding:20px 20px 18px;
+  }
+  .modal h3{margin:0 0 4px;font-size:15px;}
+  .modal p.hint{margin:0 0 16px;font-size:12px;color:var(--muted);line-height:1.5;}
+  .field-row{margin-bottom:14px;}
+  .field-row label{
+    display:block;
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    margin-bottom:6px;
+  }
+  .field-row input[type=text],
+  .field-row input[type=password],
+  .field-row select{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:4px;
+    color:var(--text);
+    font-family:var(--mono);
+    font-size:13px;
+    padding:9px 10px;
+  }
+  .field-row select{font-family:var(--sans);}
+  .field-row input:focus,.field-row select:focus{outline:1px solid var(--amber);outline-offset:0;border-color:var(--amber);}
+  .seg{
+    display:flex;
+    border:1px solid var(--border);
+    border-radius:4px;
+    overflow:hidden;
+  }
+  .seg button{
+    flex:1;
+    background:var(--bg);
+    border:none;
+    color:var(--muted);
+    font-family:var(--sans);
+    font-size:12.5px;
+    padding:9px 6px;
+    cursor:pointer;
+    border-right:1px solid var(--border);
+  }
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--amber);color:#191307;font-weight:600;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px;}
+  .save-ok{font-size:11.5px;color:var(--ok);margin-left:auto;align-self:center;display:none;}
+  .save-ok.show{display:inline;}
+ 
+  input[type=file]{display:none;}
+</style>
+</head>
+<body>
+ 
+<div class="app">
+ 
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="brand">
+      <div>
+        <h1>Картки замовлень</h1>
+        <p>Фото екрана → структуровані дані</p>
+      </div>
+      <button class="gear-btn" id="openSettings" title="Налаштування">⚙</button>
+    </div>
+ 
+    <div>
+      <p class="section-label">Додати фото</p>
+      <div class="upload-row">
+        <button class="btn block" id="pickGallery">З галереї</button>
+        <button class="btn block" id="pickCamera">З камери</button>
+      </div>
+      <input type="file" id="galleryInput" accept="image/*" multiple>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment">
+      <div id="dropArea">перетягніть фото сюди</div>
+ 
+      <div class="thumbs" id="thumbs"></div>
+      <div class="count-row">
+        <span id="countLabel">0 фото</span>
+        <button id="clearAll">очистити все</button>
+      </div>
+    </div>
+ 
+    <div class="divider"></div>
+ 
+    <div>
+      <p class="section-label">Обробка</p>
+      <button class="btn primary block process-btn" id="processBtn">Обробити фото</button>
+      <div class="progress" id="progress">
+        <span id="progressText">…</span>
+        <div class="progress-bar"><div class="progress-bar-fill" id="progressFill"></div></div>
+      </div>
+    </div>
+ 
+    <div class="banner" id="errorBanner"></div>
+ 
+    <div style="flex:1"></div>
+    <p style="font-size:11px;color:var(--muted-2);line-height:1.5;margin:0;">
+      Перед відправкою в AI фото групуються по кілька штук і об'єднуються в один колаж або PDF — це знімає обмеження на кількість зображень за один запит.
+    </p>
+  </div>
+ 
+  <!-- MAIN -->
+  <div class="main">
+    <div class="toolbar">
+      <h2 id="resultsHeader">Ще немає жодної картки</h2>
+      <div class="actions" id="exportActions" style="display:none;">
+        <button class="btn small" id="copyJsonBtn">Скопіювати JSON</button>
+        <button class="btn small" id="exportCsvBtn">Експорт CSV</button>
+      </div>
+    </div>
+ 
+    <div class="empty" id="emptyState">
+      Додайте фото екранів зліва (з галереї або камери), натисніть <b>«Обробити фото»</b> —<br>
+      і тут з'являться картки з розпізнаними даними замовлень.
+    </div>
+ 
+    <div class="cards" id="cards"></div>
+  </div>
+ 
+</div>
+ 
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>Налаштування</h3>
+    <p class="hint">Ключ Gemini API зберігається лише у вашій пам'яті додатку на цьому пристрої, окремо для вас.</p>
+ 
+    <div class="field-row">
+      <label>Gemini API ключ</label>
+      <input type="password" id="apiKeyInput" placeholder="AIza...">
+    </div>
+ 
+    <div class="field-row">
+      <label>Модель</label>
+      <input type="text" id="modelInput" value="gemini-3.5-flash-lite">
+    </div>
+ 
+    <div class="field-row">
+      <label>Фото в одному запиті (розмір колажу/PDF)</label>
+      <div class="seg" id="batchSeg">
+        <button data-v="1">1</button>
+        <button data-v="2">2</button>
+        <button data-v="4" class="active">4</button>
+        <button data-v="6">6</button>
+      </div>
+    </div>
+ 
+    <div class="field-row">
+      <label>Спосіб об'єднання</label>
+      <div class="seg" id="modeSeg">
+        <button data-v="collage" class="active">Колаж (JPG)</button>
+        <button data-v="pdf">PDF</button>
+      </div>
+    </div>
+ 
+    <div class="modal-actions">
+      <span class="save-ok" id="saveOk">Збережено</span>
+      <button class="btn ghost" id="closeSettings">Закрити</button>
+      <button class="btn primary" id="saveSettings">Зберегти</button>
+    </div>
+  </div>
+</div>
+ 
+<script>
+(function(){
+ 
+  // ---------------- state ----------------
+  let photos = []; // {id, dataURL, mime}
+  let settings = { apiKey:'', model:'gemini-3.5-flash-lite', batchSize:4, mode:'collage' };
+  let results = []; // extracted records
+ 
+  const $ = (sel) => document.querySelector(sel);
+  const thumbsEl = $('#thumbs');
+  const countLabel = $('#countLabel');
+  const cardsEl = $('#cards');
+  const emptyState = $('#emptyState');
+  const resultsHeader = $('#resultsHeader');
+  const exportActions = $('#exportActions');
+  const errorBanner = $('#errorBanner');
+ 
+  function showBanner(msg, warn){
+    errorBanner.textContent = msg;
+    errorBanner.className = 'banner show' + (warn ? ' warn' : '');
+  }
+  function hideBanner(){
+    errorBanner.className = 'banner';
+  }
+ 
+  // ---------------- persistent settings ----------------
+  async function loadSettings(){
+    try{
+      const r = await window.storage.get('gemini-settings', false);
+      if(r && r.value){
+        const parsed = JSON.parse(r.value);
+        settings = Object.assign(settings, parsed);
+      }
+    }catch(e){ /* no saved settings yet, fine */ }
+    applySettingsToUI();
+  }
+  async function saveSettings(){
+    try{
+      await window.storage.set('gemini-settings', JSON.stringify(settings), false);
+      return true;
+    }catch(e){
+      console.error('storage save failed', e);
+      return false;
+    }
+  }
+  function applySettingsToUI(){
+    $('#apiKeyInput').value = settings.apiKey || '';
+    $('#modelInput').value = settings.model || 'gemini-3.5-flash-lite';
+    document.querySelectorAll('#batchSeg button').forEach(b=>{
+      b.classList.toggle('active', Number(b.dataset.v)===Number(settings.batchSize));
+    });
+    document.querySelectorAll('#modeSeg button').forEach(b=>{
+      b.classList.toggle('active', b.dataset.v===settings.mode);
+    });
+  }
+ 
+  // ---------------- modal ----------------
+  $('#openSettings').onclick = ()=> $('#modalOverlay').classList.add('show');
+  $('#closeSettings').onclick = ()=> $('#modalOverlay').classList.remove('show');
+  $('#modalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='modalOverlay') $('#modalOverlay').classList.remove('show'); });
+ 
+  document.querySelectorAll('#batchSeg button').forEach(b=>{
+    b.onclick = ()=>{
+      document.querySelectorAll('#batchSeg button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+    };
+  });
+  document.querySelectorAll('#modeSeg button').forEach(b=>{
+    b.onclick = ()=>{
+      document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+    };
+  });
+ 
+  $('#saveSettings').onclick = async ()=>{
+    settings.apiKey = $('#apiKeyInput').value.trim();
+    settings.model = $('#modelInput').value.trim() || 'gemini-3.5-flash-lite';
+    settings.batchSize = Number(document.querySelector('#batchSeg button.active').dataset.v);
+    settings.mode = document.querySelector('#modeSeg button.active').dataset.v;
+    const ok = await saveSettings();
+    const okEl = $('#saveOk');
+    if(ok){
+      okEl.textContent = 'Збережено';
+      okEl.classList.add('show');
+      setTimeout(()=>okEl.classList.remove('show'), 1600);
+    } else {
+      okEl.textContent = 'Не вдалося зберегти';
+      okEl.style.color = 'var(--err)';
+      okEl.classList.add('show');
+    }
+  };
+ 
+  // ---------------- photo intake ----------------
+  $('#pickGallery').onclick = ()=> $('#galleryInput').click();
+  $('#pickCamera').onclick = ()=> $('#cameraInput').click();
+  $('#galleryInput').onchange = (e)=> addFiles(e.target.files);
+  $('#cameraInput').onchange = (e)=> addFiles(e.target.files);
+ 
+  const dropArea = $('#dropArea');
+  ['dragover','dragenter'].forEach(ev=>{
+    dropArea.addEventListener(ev,(e)=>{ e.preventDefault(); dropArea.classList.add('drag'); });
+  });
+  ['dragleave','drop'].forEach(ev=>{
+    dropArea.addEventListener(ev,(e)=>{ e.preventDefault(); dropArea.classList.remove('drag'); });
+  });
+  dropArea.addEventListener('drop',(e)=>{
+    if(e.dataTransfer.files && e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+  });
+ 
+  function addFiles(fileList){
+    hideBanner();
+    Array.from(fileList).forEach(file=>{
+      if(!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (e)=>{
+        photos.push({ id: Date.now()+'-'+Math.random().toString(36).slice(2), dataURL: e.target.result, mime: file.type });
+        renderThumbs();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+ 
+  function renderThumbs(){
+    thumbsEl.innerHTML = '';
+    photos.forEach((p, i)=>{
+      const div = document.createElement('div');
+      div.className = 'thumb';
+      div.innerHTML = `<img src="${p.dataURL}"><span class="idx">${i+1}</span><span class="rm" data-id="${p.id}">✕</span>`;
+      thumbsEl.appendChild(div);
+    });
+    thumbsEl.querySelectorAll('.rm').forEach(btn=>{
+      btn.onclick = ()=>{
+        photos = photos.filter(p=>p.id !== btn.dataset.id);
+        renderThumbs();
+      };
+    });
+    countLabel.textContent = photos.length + ' фото';
+  }
+ 
+  $('#clearAll').onclick = ()=>{
+    photos = [];
+    renderThumbs();
+  };
+ 
+  // ---------------- image helpers ----------------
+  function loadImage(dataURL){
+    return new Promise((resolve,reject)=>{
+      const img = new Image();
+      img.onload = ()=>resolve(img);
+      img.onerror = reject;
+      img.src = dataURL;
+    });
+  }
+ 
+  function chunk(arr, size){
+    const out = [];
+    for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size));
+    return out;
+  }
+ 
+  // build one JPEG collage (grid) from a batch of photo dataURLs
+  async function buildCollage(batch){
+    const imgs = await Promise.all(batch.map(p=>loadImage(p.dataURL)));
+    const n = imgs.length;
+    const cols = n <= 1 ? 1 : (n <= 2 ? 2 : (n<=4 ? 2 : 3));
+    const rows = Math.ceil(n/cols);
+    const cellW = 1000;
+    const gap = 14;
+    // determine cell height as max scaled height among images in that cell width
+    const scaledHeights = imgs.map(img => cellW * (img.height/img.width));
+    const cellH = Math.max(...scaledHeights, 700);
+ 
+    const canvas = document.createElement('canvas');
+    canvas.width = cols*cellW + (cols+1)*gap;
+    canvas.height = rows*cellH + (rows+1)*gap;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+ 
+    imgs.forEach((img,i)=>{
+      const col = i % cols;
+      const row = Math.floor(i/cols);
+      const x = gap + col*(cellW+gap);
+      const y = gap + row*(cellH+gap);
+      const scale = Math.min(cellW/img.width, cellH/img.height);
+      const w = img.width*scale;
+      const h = img.height*scale;
+      const dx = x + (cellW-w)/2;
+      const dy = y + (cellH-h)/2;
+      ctx.strokeStyle = '#cccccc';
+      ctx.strokeRect(x,y,cellW,cellH);
+      ctx.drawImage(img, dx, dy, w, h);
+    });
+ 
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+    return { base64: dataUrl.split(',')[1], mime: 'image/jpeg' };
+  }
+ 
+  // build a multi-page PDF from a batch of photo dataURLs
+  async function buildPDF(batch){
+    const { jsPDF } = window.jspdf;
+    const imgs = await Promise.all(batch.map(p=>loadImage(p.dataURL)));
+    let doc;
+    imgs.forEach((img, i)=>{
+      const orientation = img.width > img.height ? 'l' : 'p';
+      const fmt = [img.width, img.height];
+      if(i===0){
+        doc = new jsPDF({ orientation, unit:'px', format: fmt, compress:true });
+      } else {
+        doc.addPage(fmt, orientation);
+      }
+      doc.addImage(batch[i].dataURL, 'JPEG', 0, 0, img.width, img.height);
+    });
+    const dataUri = doc.output('datauristring');
+    return { base64: dataUri.split(',')[1], mime: 'application/pdf' };
+  }
+ 
+  // ---------------- Gemini call ----------------
+  const FIELD_SCHEMA = [
+    'numer_zlecenia','pracownik_kod','pracownik_nazwisko','data_rozpoczecia',
+    'maszyna_forma','nr_katalogowy','nazwa_produktu','klient',
+    'uwagi_zamowienia','uwagi_zlecenia','ilosc_na_zleceniu','opis_operacji',
+    'szt_na_palecie','rodzaj_palety','wysokosc_palety','szt_w_kartonie'
+  ];
+ 
+  const PROMPT = `Це скріншоти екранів виробничої/складської ERP-системи (HermesSQL), таблиці та картки "Zlecone operacje" (замовлені операції), польською мовою. На зображенні може бути кілька рядків списку та/або одна чи кілька детальних карток одного замовлення.
+ 
+Твоє завдання: знайти КОЖНЕ окреме замовлення (унікальний "Numer zlecenia") і повернути по ньому один об'єкт JSON з такими полями (рядки, якщо поля немає або воно порожнє/"-" — став порожній рядок ""):
+ 
+- numer_zlecenia — номер замовлення (напр. ZPR/P /2026/005945)
+- pracownik_kod — код працівника (Pracownik, напр. P00185)
+- pracownik_nazwisko — ім'я/прізвище працівника
+- data_rozpoczecia — планована дата початку (Planowana data rozpoczęcia)
+- maszyna_forma — машина + форма разом (напр. "S-63 + IML, forma 393")
+- nr_katalogowy — Numer katalogowy (повний, з детальної картки, якщо є)
+- nazwa_produktu — Nazwa (повна назва товару)
+- klient — Klient
+- uwagi_zamowienia — Uwagi do zamówienia
+- uwagi_zlecenia — Uwagi do zlecenia
+- ilosc_na_zleceniu — Ilość na zleceniu
+- opis_operacji — Opis operacji
+- szt_na_palecie — SZT na palecie
+- rodzaj_palety — Rodzaj palety
+- wysokosc_palety — Wysokość palety
+- szt_w_kartonie — SZT w kartonie
+ 
+Якщо те саме замовлення зустрічається і в рядку списку, і в детальній картці — об'єднай в ОДИН запис, беручи найповніші/найточніші значення (детальна картка зазвичай точніша за rozpoczecia/nr katalogowy/nazwa). Не дублюй замовлення.
+ 
+Зберігай текст так, як він написаний на екрані (з польськими діакритичними знаками), нічого не перекладай і не вигадуй.
+ 
+Поверни ЛИШЕ валідний JSON-масив об'єктів з переліченими вище ключами. Без markdown, без пояснень, без коду в трьох апострофах.`;
+ 
+  async function callGemini(base64, mime){
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(settings.model)}:generateContent?key=${encodeURIComponent(settings.apiKey)}`;
+    const body = {
+      contents: [{
+        parts: [
+          { text: PROMPT },
+          { inline_data: { mime_type: mime, data: base64 } }
+        ]
+      }],
+      generationConfig: {
+        temperature: 0,
+        response_mime_type: 'application/json'
+      }
+    };
+    const resp = await fetch(url, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(body)
+    });
+    if(!resp.ok){
+      let errText = '';
+      try{ const j = await resp.json(); errText = j.error && j.error.message ? j.error.message : JSON.stringify(j); }
+      catch(e){ errText = resp.statusText; }
+      throw new Error(`Gemini API помилка (${resp.status}): ${errText}`);
+    }
+    const data = await resp.json();
+    const text = (((data.candidates||[])[0]||{}).content||{}).parts?.map(p=>p.text||'').join('') || '';
+    let cleaned = text.trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+    let parsed;
+    try{
+      parsed = JSON.parse(cleaned);
+    }catch(e){
+      throw new Error('Не вдалося розпізнати відповідь AI як JSON. Спробуйте зменшити кількість фото в одному запиті.');
+    }
+    if(!Array.isArray(parsed)) parsed = [parsed];
+    return parsed;
+  }
+ 
+  // ---------------- merge / dedupe ----------------
+  function mergeRecord(base, incoming){
+    const merged = Object.assign({}, base);
+    FIELD_SCHEMA.forEach(k=>{
+      const a = (base[k]||'').toString().trim();
+      const b = (incoming[k]||'').toString().trim();
+      if(!a && b) merged[k] = b;
+      else if(a && b && b.length > a.length) merged[k] = b;
+      else merged[k] = a || b || '';
+    });
+    return merged;
+  }
+ 
+  function addResults(newRecords){
+    newRecords.forEach(rec=>{
+      const clean = {};
+      FIELD_SCHEMA.forEach(k => clean[k] = (rec[k]!==undefined && rec[k]!==null) ? String(rec[k]).trim() : '');
+      const key = clean.numer_zlecenia;
+      if(key){
+        const existingIdx = results.findIndex(r => r.numer_zlecenia === key);
+        if(existingIdx >= 0){
+          results[existingIdx] = mergeRecord(results[existingIdx], clean);
+          return;
+        }
+      }
+      results.push(clean);
+    });
+  }
+ 
+  // ---------------- processing pipeline ----------------
+  $('#processBtn').onclick = processAll;
+ 
+  async function processAll(){
+    hideBanner();
+    if(photos.length === 0){
+      showBanner('Спочатку додайте хоча б одне фото.', true);
+      return;
+    }
+    if(!settings.apiKey){
+      showBanner('Вкажіть Gemini API ключ у налаштуваннях (значок ⚙).', true);
+      $('#modalOverlay').classList.add('show');
+      return;
+    }
+ 
+    const batches = chunk(photos, settings.batchSize);
+    const btn = $('#processBtn');
+    btn.disabled = true;
+    const progress = $('#progress');
+    const progressText = $('#progressText');
+    const progressFill = $('#progressFill');
+    progress.classList.add('show');
+ 
+    let failures = 0;
+ 
+    for(let i=0;i<batches.length;i++){
+      progressText.textContent = `Обробка ${i+1} / ${batches.length}…`;
+      progressFill.style.width = Math.round((i/batches.length)*100) + '%';
+      try{
+        const combined = settings.mode === 'pdf' ? await buildPDF(batches[i]) : await buildCollage(batches[i]);
+        const records = await callGemini(combined.base64, combined.mime);
+        addResults(records);
+        renderCards();
+      }catch(e){
+        console.error(e);
+        failures++;
+        showBanner((e.message || 'Помилка обробки одного з пакетів фото.') , true);
+      }
+    }
+ 
+    progressFill.style.width = '100%';
+    setTimeout(()=>{ progress.classList.remove('show'); progressFill.style.width='0%'; }, 900);
+    btn.disabled = false;
+ 
+    if(failures === 0) hideBanner();
+  }
+ 
+  // ---------------- rendering ----------------
+  const FIELD_LABELS = {
+    pracownik_kod:'Працівник',
+    pracownik_nazwisko:'Ім\\'я',
+    data_rozpoczecia:'Дата початку',
+    maszyna_forma:'Машина/форма',
+    nr_katalogowy:'Кат. номер',
+    klient:'Клієнт',
+    uwagi_zamowienia:'Прим. замовл.',
+    uwagi_zlecenia:'Прим. до зл.',
+    ilosc_na_zleceniu:'Кількість',
+    opis_operacji:'Операція',
+    szt_na_palecie:'Шт/палета',
+    rodzaj_palety:'Тип палети',
+    wysokosc_palety:'Висота палети',
+    szt_w_kartonie:'Шт/картон'
+  };
+ 
+  function renderCards(){
+    cardsEl.innerHTML = '';
+    if(results.length === 0){
+      emptyState.style.display = 'block';
+      exportActions.style.display = 'none';
+      resultsHeader.textContent = 'Ще немає жодної картки';
+      return;
+    }
+    emptyState.style.display = 'none';
+    exportActions.style.display = 'flex';
+    resultsHeader.textContent = results.length + (results.length===1 ? ' картка' : ' карток');
+ 
+    results.forEach(rec=>{
+      const card = document.createElement('div');
+      card.className = 'card';
+      const fieldsHtml = Object.keys(FIELD_LABELS).map(k=>{
+        const v = rec[k];
+        return `<div class="field"><span class="k">${FIELD_LABELS[k]}</span><span class="v ${v?'':'empty'}">${v ? escapeHtml(v) : '—'}</span></div>`;
+      }).join('');
+      card.innerHTML = `
+        <div class="stub">
+          <div class="order-no">${escapeHtml(rec.numer_zlecenia || 'Без номера')}</div>
+          <div class="name">${escapeHtml(rec.nazwa_produktu || '')}</div>
+        </div>
+        <div class="perf"></div>
+        <div class="fields">${fieldsHtml}</div>
+      `;
+      cardsEl.appendChild(card);
+    });
+  }
+ 
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+ 
+  // ---------------- export ----------------
+  $('#copyJsonBtn').onclick = async ()=>{
+    try{
+      await navigator.clipboard.writeText(JSON.stringify(results, null, 2));
+      flashBtn($('#copyJsonBtn'), 'Скопійовано ✓');
+    }catch(e){
+      showBanner('Не вдалося скопіювати в буфер обміну.', true);
+    }
+  };
+ 
+  $('#exportCsvBtn').onclick = ()=>{
+    const headers = ['numer_zlecenia', ...Object.keys(FIELD_LABELS), 'nazwa_produktu'];
+    const rows = [headers.join(',')];
+    results.forEach(rec=>{
+      const row = headers.map(h => `"${(rec[h]||'').replace(/"/g,'""')}"`);
+      rows.push(row.join(','));
+    });
+    const blob = new Blob(['\uFEFF'+rows.join('\n')], { type:'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'zamowienia.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+ 
+  function flashBtn(btn, msg){
+    const original = btn.textContent;
+    btn.textContent = msg;
+    setTimeout(()=>btn.textContent = original, 1400);
+  }
+ 
+  // ---------------- init ----------------
+  loadSettings();
+  renderCards();
+ 
+})();
+</script>
+</body>
+</html>
+ 
