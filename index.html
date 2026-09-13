@@ -839,6 +839,15 @@
     return parsed;
   }
  
+  // Номер етикетки з "Uwagi do zamówienia": завжди 6-значний код, перед яким
+  // інколи стоїть один символ-префікс (напр. E, G, #), а інколи взагалі нічого.
+  // Повертає знайдений код або '' якщо коду немає.
+  function labelCodeFrom(s){
+    if(!s) return '';
+    const m = String(s).match(/[A-ZĄĆĘŁŃÓŚŹŻ#]?\d{6}\b/i);
+    return m ? m[0] : '';
+  }
+
   // ---------------- merge / dedupe ----------------
   function mergeRecord(base, incoming){
     const merged = Object.assign({}, base);
@@ -852,10 +861,17 @@
     return merged;
   }
  
+  // Зберігаємо тільки замовлення, де вдалося розпізнати номер етикетки
+  // (6-значний код у "Uwagi do zamówienia"). Решту пропускаємо.
   function addResults(newRecords){
+    let skipped = 0;
     newRecords.forEach(rec=>{
       const clean = {};
       FIELD_SCHEMA.forEach(k => clean[k] = (rec[k]!==undefined && rec[k]!==null) ? String(rec[k]).trim() : '');
+      if(!labelCodeFrom(clean.uwagi_zamowienia)){
+        skipped++;
+        return;
+      }
       const key = clean.numer_zlecenia;
       if(key){
         const existingIdx = results.findIndex(r => r.numer_zlecenia === key);
@@ -866,6 +882,7 @@
       }
       results.push(clean);
     });
+    return skipped;
   }
  
   // ---------------- processing pipeline ----------------
@@ -892,6 +909,7 @@
     progress.classList.add('show');
  
     let failures = 0;
+    let totalSkipped = 0;
  
     for(let i=0;i<batches.length;i++){
       progressText.textContent = `Обробка ${i+1} / ${batches.length}…`;
@@ -899,7 +917,7 @@
       try{
         const combined = settings.mode === 'pdf' ? await buildPDF(batches[i]) : await buildCollage(batches[i]);
         const records = await callGemini(combined.base64, combined.mime);
-        addResults(records);
+        totalSkipped += addResults(records);
         renderCards();
       }catch(e){
         console.error(e);
@@ -912,7 +930,13 @@
     setTimeout(()=>{ progress.classList.remove('show'); progressFill.style.width='0%'; }, 900);
     btn.disabled = false;
  
-    if(failures === 0) hideBanner();
+    if(failures === 0){
+      if(totalSkipped > 0){
+        showBanner(`Пропущено ${totalSkipped} ${totalSkipped===1 ? 'замовлення' : 'замовлень'} без розпізнаного номера етикетки.`, true);
+      } else {
+        hideBanner();
+      }
+    }
   }
  
   // ---------------- rendering ----------------
@@ -927,15 +951,6 @@
     ['uwagi_zlecenia', 'Uwagi do zlecenia'],
     ['ilosc_na_zleceniu', 'Ilość na zleceniu']
   ];
-
-  // Номер етикетки з "Uwagi do zamówienia": завжди 6-значний код, перед яким
-  // інколи стоїть один символ-префікс (напр. E, G, #), а інколи взагалі нічого.
-  function extractLabelCode(s){
-    if(!s) return '';
-    const str = String(s);
-    const m = str.match(/[A-ZĄĆĘŁŃÓŚŹŻ#]?\d{6}\b/i);
-    return m ? m[0] : str.trim();
-  }
 
   function renderCards(){
     cardsEl.innerHTML = '';
@@ -953,7 +968,7 @@
       const card = document.createElement('div');
       card.className = 'card';
  
-      const labelCode = extractLabelCode(rec.uwagi_zamowienia);
+      const labelCode = labelCodeFrom(rec.uwagi_zamowienia);
       const compactParts = [rec.maszyna_forma, labelCode].filter(Boolean).map(escapeHtml);
       const compactLine = compactParts.join('&nbsp;&nbsp;') || '—';
  
